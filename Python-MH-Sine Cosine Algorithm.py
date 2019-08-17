@@ -12,93 +12,70 @@
 ############################################################################
 
 # Required Libraries
-import pandas as pd
 import numpy  as np
 import math
 import random
 import os
 
+# Function
+def target_function():
+    return
+
 # Function: Initialize Variables
-def initial_position(solutions = 5, min_values = [-5,-5], max_values = [5,5]):
-    position = pd.DataFrame(np.zeros((solutions, len(min_values))))
-    position['Fitness'] = 0.0
+def initial_position(solutions = 5, min_values = [-5,-5], max_values = [5,5], target_function = target_function):
+    position = np.zeros((solutions, len(min_values)+1))
     for i in range(0, solutions):
         for j in range(0, len(min_values)):
-             position.iloc[i,j] = random.uniform(min_values[j], max_values[j])
-        position.iloc[i,-1] = target_function(position.iloc[i,0:position.shape[1]-1])
+             position[i,j] = random.uniform(min_values[j], max_values[j])
+        position[i,-1] = target_function(position[i,0:position.shape[1]-1])
     return position
 
-# Function: Initialize Destination Position
-def destination_position(dimension = 2):
-    destination = pd.DataFrame(np.zeros((1, dimension)))
-    destination['Fitness'] = 0.0
-    for j in range(0, dimension):
-        destination.iloc[0,j] = 0.0
-    destination.iloc[0,-1] = target_function(destination.iloc[0,0:destination.shape[1]-1])
-    return destination
-
-# Function: Updtade Destination by Fitness
-def update_destination(position, destination):
-    updated_position = position.copy(deep = True)
-    for i in range(0, position.shape[0]):
-        if (updated_position.iloc[i,-1] < destination.iloc[0,-1]):
-            for j in range(0, updated_position.shape[1]):
-                destination.iloc[0,j] = updated_position.iloc[i,j]
-    return destination
-
 # Function: Updtade Position
-def update_position(position, destination, r1 = 2, min_values = [-5,-5], max_values = [5,5]):
-    updated_position = position.copy(deep = True)
-    
-    for i in range(0, updated_position.shape[0]):
-        for j in range (0, len(min_values)):
-           
+def update_position(position, destination, r1 = 2, min_values = [-5,-5], max_values = [5,5], target_function = target_function):   
+    for i in range(0, position.shape[0]):
+        for j in range (0, len(min_values)):         
             r2 = 2*math.pi*(int.from_bytes(os.urandom(8), byteorder = "big") / ((1 << 64) - 1))
             r3 = 2*(int.from_bytes(os.urandom(8), byteorder = "big") / ((1 << 64) - 1))
-            r4 = int.from_bytes(os.urandom(8), byteorder = "big") / ((1 << 64) - 1)
-            
+            r4 = int.from_bytes(os.urandom(8), byteorder = "big") / ((1 << 64) - 1)          
             if (r4 < 0.5):
-                updated_position.iloc[i,j] = updated_position.iloc[i,j] + (r1*math.sin(r2)*abs(r3*destination.iloc[0,j] - updated_position.iloc[i,j]))
-                if (updated_position.iloc[i,j] > max_values[j]):
-                    updated_position.iloc[i,j] = max_values[j]
-                elif (updated_position.iloc[i,j] < min_values[j]):
-                    updated_position.iloc[i,j] = min_values[j] 
+                position[i,j] = np.clip((position[i,j] + (r1*math.sin(r2)*abs(r3*destination[j] - position[i,j]))),min_values[j],max_values[j])
             else:
-                updated_position.iloc[i,j] = updated_position.iloc[i,j] + (r1*math.cos(r2)*abs(r3*destination.iloc[0,j] - updated_position.iloc[i,j]))
-                if (updated_position.iloc[i,j] > max_values[j]):
-                    updated_position.iloc[i,j] = max_values[j]
-                elif (updated_position.iloc[i,j] < min_values[j]):
-                    updated_position.iloc[i,j] = min_values[j]        
-        
-        updated_position.iloc[i,-1] = target_function(updated_position.iloc[i,0:updated_position.shape[1]-1])
-            
-    return updated_position
+                position[i,j] = np.clip((position[i,j] + (r1*math.cos(r2)*abs(r3*destination[j] - position[i,j]))),min_values[j],max_values[j])              
+        position[i,-1] = target_function(position[i,0:position.shape[1]-1])
+    return position
 
 # SCA Function
-def sine_cosine_algorithm(solutions = 5, a_linear_component = 2,  min_values = [-5,-5], max_values = [5,5], iterations = 50):    
-    count = 0
-    position = initial_position(solutions = solutions, min_values = min_values, max_values = max_values)
-    destination = destination_position(dimension = len(min_values))
-    
-
-    while (count <= iterations):
-        
-        print("Iteration = ", count, " f(x) = ", destination.iloc[destination['Fitness'].idxmin(),-1])
-        r1 = a_linear_component - count*(a_linear_component/iterations)
-                
-        destination = update_destination(position, destination)
-        position = update_position(position, destination, r1 = r1, min_values = min_values, max_values = max_values)
-        
-        count = count + 1 
-        
-    print(destination.iloc[destination['Fitness'].idxmin(),:].copy(deep = True))    
-    return destination.iloc[destination['Fitness'].idxmin(),:].copy(deep = True)
+def sine_cosine_algorithm(solutions = 5, a_linear_component = 2,  min_values = [-5,-5], max_values = [5,5], iterations = 50, target_function = target_function):    
+    count       = 0
+    position    = initial_position(solutions = solutions, min_values = min_values, max_values = max_values, target_function = target_function)
+    destination = np.copy(position[position[:,-1].argsort()][0,:])
+    while (count <= iterations):  
+        print("Iteration = ", count, " f(x) = ", destination[-1])
+        r1          = a_linear_component - count*(a_linear_component/iterations)   
+        position    = update_position(position, destination, r1 = r1, min_values = min_values, max_values = max_values, target_function = target_function)
+        value       = np.copy(position[position[:,-1].argsort()][0,:])
+        if (destination[-1] > value[-1]):
+            destination = np.copy(value)
+        count       = count + 1 
+    print(destination)    
+    return destination
 
 ######################## Part 1 - Usage ####################################
 
-# Function to be Minimized. Solution ->  f(x1, x2) = -1.0316; x1 = 0.0898, x2 = -0.7126 or x1 = -0.0898, x2 = 0.7126
-def target_function (variables_values = [0, 0]):
+# Function to be Minimized (Six Hump Camel Back). Solution ->  f(x1, x2) = -1.0316; x1 = 0.0898, x2 = -0.7126 or x1 = -0.0898, x2 = 0.7126
+def six_hump_camel_back(variables_values = [0, 0]):
     func_value = 4*variables_values[0]**2 - 2.1*variables_values[0]**4 + (1/3)*variables_values[0]**6 + variables_values[0]*variables_values[1] - 4*variables_values[1]**2 + 4*variables_values[1]**4
     return func_value
 
-sca = sine_cosine_algorithm(solutions = 5, a_linear_component = 2,  min_values = [-5,-5], max_values = [5,5], iterations = 100)
+sca = sine_cosine_algorithm(solutions = 50, a_linear_component = 2,  min_values = [-5,-5], max_values = [5,5], iterations = 1000, target_function = six_hump_camel_back)
+
+# Function to be Minimized (Rosenbrocks Valley). Solution ->  f(x) = 0; xi = 1
+def rosenbrocks_valley(variables_values = [0,0]):
+    func_value = 0
+    last_x = variables_values[0]
+    for i in range(1, len(variables_values)):
+        func_value = func_value + (100 * math.pow((variables_values[i] - math.pow(last_x, 2)), 2)) + math.pow(1 - last_x, 2)
+    return func_value
+
+sca = sine_cosine_algorithm(solutions = 50, a_linear_component = 2,  min_values = [-5,-5], max_values = [5,5], iterations = 1000, target_function = rosenbrocks_valley)
+
